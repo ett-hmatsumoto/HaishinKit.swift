@@ -14,11 +14,31 @@ final class RTMPMuxer {
     private var configs: [Int: Data] = [:]
     private var audioTimestamp = CMTime.zero
     private var videoTimestamp = CMTime.zero
+    private var firstAudioTimestamp = CMTime.zero
+    private var relativeAudioTimestamp = CMTime.zero
+    private var firstVideoTimestamp = CMTime.zero
+    private var relativeVideoTimestamp = CMTime.zero
 
     func dispose() {
         configs.removeAll()
         audioTimestamp = CMTime.zero
         videoTimestamp = CMTime.zero
+        firstVideoTimestamp = CMTime.zero
+        relativeVideoTimestamp = CMTime.zero
+        firstAudioTimestamp = CMTime.zero
+        relativeAudioTimestamp = CMTime.zero
+    }
+
+    private func getTimetampGap(_ expected: CMTime, actual: CMTime) -> CMTime {
+        let gap = expected - actual
+        if 0.001 < gap.seconds {
+            return gap
+        }
+        return CMTime.zero
+    }
+
+    private func transformMillisecToCMTime(_ millisec: Double) -> CMTime {
+        CMTime(seconds: millisec / 1000, preferredTimescale: 1000)
     }
 }
 
@@ -34,14 +54,24 @@ extension RTMPMuxer: AudioConverterDelegate {
     }
 
     func sampleOutput(audio data: UnsafeMutableAudioBufferListPointer, presentationTimeStamp: CMTime) {
-        let delta: Double = (audioTimestamp == CMTime.zero ? 0 : presentationTimeStamp.seconds - audioTimestamp.seconds) * 1000
+        var delta: Double = (audioTimestamp == CMTime.zero ? 0 : (presentationTimeStamp - audioTimestamp).seconds) * 1000
         guard let bytes = data[0].mData, 0 < data[0].mDataByteSize && 0 <= delta else {
             return
         }
+
+        if firstAudioTimestamp == .zero {
+            firstAudioTimestamp = presentationTimeStamp
+        }
+        let expectedTimestamp = presentationTimeStamp - firstAudioTimestamp
+        let actualTimestamp = relativeAudioTimestamp + transformMillisecToCMTime(delta)
+        let gap = getTimetampGap(expectedTimestamp, actual: actualTimestamp)
+        delta += gap.seconds * 1000
+
         var buffer = Data([RTMPMuxer.aac, FLVAACPacketType.raw.rawValue])
         buffer.append(bytes.assumingMemoryBound(to: UInt8.self), count: Int(data[0].mDataByteSize))
         delegate?.sampleOutput(audio: buffer, withTimestamp: delta, muxer: self)
         audioTimestamp = presentationTimeStamp
+        relativeAudioTimestamp = relativeAudioTimestamp + transformMillisecToCMTime(delta)
     }
 }
 
@@ -68,15 +98,25 @@ extension RTMPMuxer: VideoEncoderDelegate {
         } else {
             compositionTime = Int32((presentationTimeStamp.seconds - decodeTimeStamp.seconds) * 1000)
         }
-        let delta: Double = (videoTimestamp == CMTime.zero ? 0 : decodeTimeStamp.seconds - videoTimestamp.seconds) * 1000
+        var delta: Double = (videoTimestamp == CMTime.zero ? 0 : (decodeTimeStamp - videoTimestamp).seconds) * 1000
         guard let data = sampleBuffer.dataBuffer?.data, 0 <= delta else {
             return
         }
+
+        if firstVideoTimestamp == .zero {
+            firstVideoTimestamp = decodeTimeStamp
+        }
+        let expectedTimestamp = decodeTimeStamp - firstVideoTimestamp
+        let actualTimestamp = relativeVideoTimestamp + transformMillisecToCMTime(delta)
+        let gap = getTimetampGap(expectedTimestamp, actual: actualTimestamp)
+        delta += gap.seconds * 1000
+
         var buffer = Data([((keyframe ? FLVFrameType.key.rawValue : FLVFrameType.inter.rawValue) << 4) | FLVVideoCodec.avc.rawValue, FLVAVCPacketType.nal.rawValue])
         buffer.append(contentsOf: compositionTime.bigEndian.data[1..<4])
         buffer.append(data)
         delegate?.sampleOutput(video: buffer, withTimestamp: delta, muxer: self)
         videoTimestamp = decodeTimeStamp
+        relativeVideoTimestamp = relativeVideoTimestamp + transformMillisecToCMTime(delta)
     }
 }
 
