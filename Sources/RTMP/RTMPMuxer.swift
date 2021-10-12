@@ -32,7 +32,7 @@ final class RTMPMuxer {
     private func getTimestampGap(_ expected: CMTime, actual: CMTime) -> CMTime {
         let gap = expected - actual
         if 0.001 < gap.seconds {
-            return gap
+            return CMTime(seconds: 0.002, preferredTimescale: 1000)
         }
         return CMTime.zero
     }
