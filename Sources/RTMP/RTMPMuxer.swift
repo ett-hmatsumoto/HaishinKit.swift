@@ -29,7 +29,7 @@ final class RTMPMuxer {
         relativeAudioTimestamp = CMTime.zero
     }
 
-    private func getTimetampGap(_ expected: CMTime, actual: CMTime) -> CMTime {
+    private func getTimestampGap(_ expected: CMTime, actual: CMTime) -> CMTime {
         let gap = expected - actual
         if 0.001 < gap.seconds {
             return gap
@@ -64,7 +64,7 @@ extension RTMPMuxer: AudioConverterDelegate {
         }
         let expectedTimestamp = presentationTimeStamp - firstAudioTimestamp
         let actualTimestamp = relativeAudioTimestamp + transformMillisecToCMTime(delta)
-        let gap = getTimetampGap(expectedTimestamp, actual: actualTimestamp)
+        let gap = getTimestampGap(expectedTimestamp, actual: actualTimestamp)
         delta += gap.seconds * 1000
 
         var buffer = Data([RTMPMuxer.aac, FLVAACPacketType.raw.rawValue])
@@ -108,7 +108,7 @@ extension RTMPMuxer: VideoEncoderDelegate {
         }
         let expectedTimestamp = decodeTimeStamp - firstVideoTimestamp
         let actualTimestamp = relativeVideoTimestamp + transformMillisecToCMTime(delta)
-        let gap = getTimetampGap(expectedTimestamp, actual: actualTimestamp)
+        let gap = getTimestampGap(expectedTimestamp, actual: actualTimestamp)
         delta += gap.seconds * 1000
 
         var buffer = Data([((keyframe ? FLVFrameType.key.rawValue : FLVFrameType.inter.rawValue) << 4) | FLVVideoCodec.avc.rawValue, FLVAVCPacketType.nal.rawValue])
