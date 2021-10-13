@@ -14,19 +14,11 @@ final class RTMPMuxer {
     private var configs: [Int: Data] = [:]
     private var audioTimestamp = 0
     private var videoTimestamp = 0
-    private var firstAudioTimestamp = 0
-    private var relativeAudioTimestamp = 0
-    private var firstVideoTimestamp = 0
-    private var relativeVideoTimestamp = 0
 
     func dispose() {
         configs.removeAll()
         audioTimestamp = 0
         videoTimestamp = 0
-        firstVideoTimestamp = 0
-        relativeVideoTimestamp = 0
-        firstAudioTimestamp = 0
-        relativeAudioTimestamp = 0
     }
 }
 
@@ -48,19 +40,10 @@ extension RTMPMuxer: AudioConverterDelegate {
             return
         }
 
-        if firstAudioTimestamp == 0 {
-            firstAudioTimestamp = currenttimeMillis
-        }
-        let expectedTimestamp = currenttimeMillis - firstAudioTimestamp
-        let actualTimestamp = relativeAudioTimestamp + delta
-
-        print("audio expected=\(expectedTimestamp) actual=\(actualTimestamp)")
-
         var buffer = Data([RTMPMuxer.aac, FLVAACPacketType.raw.rawValue])
         buffer.append(bytes.assumingMemoryBound(to: UInt8.self), count: Int(data[0].mDataByteSize))
         delegate?.sampleOutput(audio: buffer, withTimestamp: Double(delta), muxer: self)
         audioTimestamp = currenttimeMillis
-        relativeAudioTimestamp = relativeAudioTimestamp + delta
     }
 }
 
@@ -93,20 +76,11 @@ extension RTMPMuxer: VideoEncoderDelegate {
             return
         }
 
-        if firstVideoTimestamp == 0 {
-            firstVideoTimestamp = currenttimeMillis
-        }
-        let expectedTimestamp = currenttimeMillis - firstVideoTimestamp
-        let actualTimestamp = relativeVideoTimestamp + delta
-
-        print("video expected=\(expectedTimestamp) actual=\(actualTimestamp)")
-
         var buffer = Data([((keyframe ? FLVFrameType.key.rawValue : FLVFrameType.inter.rawValue) << 4) | FLVVideoCodec.avc.rawValue, FLVAVCPacketType.nal.rawValue])
         buffer.append(contentsOf: compositionTime.bigEndian.data[1..<4])
         buffer.append(data)
         delegate?.sampleOutput(video: buffer, withTimestamp: Double(delta), muxer: self)
         videoTimestamp = currenttimeMillis
-        relativeVideoTimestamp = relativeVideoTimestamp + delta
     }
 }
 
