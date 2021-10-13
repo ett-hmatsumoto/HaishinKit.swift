@@ -62,7 +62,7 @@ extension RTMPMuxer: AudioConverterDelegate {
             audioPTSFirst = pts
         }
 
-        print("audio timestamp=\(currentUptimeMillis - audioTimestampFirst) pts=\(pts - audioPTS)")
+        print("audio timestamp=\(currentUptimeMillis - audioTimestampFirst) pts=\(pts - audioPTSFirst)")
 
         var buffer = Data([RTMPMuxer.aac, FLVAACPacketType.raw.rawValue])
         buffer.append(bytes.assumingMemoryBound(to: UInt8.self), count: Int(data[0].mDataByteSize))
@@ -111,7 +111,7 @@ extension RTMPMuxer: VideoEncoderDelegate {
             videoPTSFirst = pts
         }
 
-        print("video timestamp=\(currentUptimeMillis - videoTimestampFirst) pts=\(pts - audioPTS)")
+        print("video timestamp=\(currentUptimeMillis - videoTimestampFirst) pts=\(pts - videoPTSFirst)")
 
         var buffer = Data([((keyframe ? FLVFrameType.key.rawValue : FLVFrameType.inter.rawValue) << 4) | FLVVideoCodec.avc.rawValue, FLVAVCPacketType.nal.rawValue])
         buffer.append(contentsOf: compositionTime.bigEndian.data[1..<4])
