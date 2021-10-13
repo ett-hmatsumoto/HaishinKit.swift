@@ -40,7 +40,7 @@ extension RTMPMuxer: AudioConverterDelegate {
     func sampleOutput(audio data: UnsafeMutableAudioBufferListPointer, presentationTimeStamp: CMTime) {
         let currentUptimeMillis = Int(floor(ProcessInfo.processInfo.systemUptime * 1000))
         let delta = audioTimestamp == 0 ? 0 : currentUptimeMillis - audioTimestamp
-        print("audio delta=\(delta) pts-delta=\(Int(round(presentationTimeStamp.seconds) * 1000) - audioPTS)")
+        print("audio delta=\(delta) pts-delta=\(Int(round(presentationTimeStamp.seconds * 1000)) - audioPTS)")
         guard let bytes = data[0].mData, 0 < data[0].mDataByteSize && 0 <= delta else {
             return
         }
