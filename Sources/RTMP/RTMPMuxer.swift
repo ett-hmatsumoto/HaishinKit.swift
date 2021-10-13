@@ -40,6 +40,8 @@ extension RTMPMuxer: AudioConverterDelegate {
             return
         }
 
+        print("audio delta=\(delta)")
+
         var buffer = Data([RTMPMuxer.aac, FLVAACPacketType.raw.rawValue])
         buffer.append(bytes.assumingMemoryBound(to: UInt8.self), count: Int(data[0].mDataByteSize))
         delegate?.sampleOutput(audio: buffer, withTimestamp: Double(delta), muxer: self)
@@ -76,6 +78,8 @@ extension RTMPMuxer: VideoEncoderDelegate {
         guard let data = sampleBuffer.dataBuffer?.data, 0 <= delta else {
             return
         }
+
+        print("video delta=\(delta)")
 
         var buffer = Data([((keyframe ? FLVFrameType.key.rawValue : FLVFrameType.inter.rawValue) << 4) | FLVVideoCodec.avc.rawValue, FLVAVCPacketType.nal.rawValue])
         buffer.append(contentsOf: compositionTime.bigEndian.data[1..<4])
