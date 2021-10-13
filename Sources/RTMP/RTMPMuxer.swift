@@ -14,23 +14,23 @@ final class RTMPMuxer {
     private var configs: [Int: Data] = [:]
     private var audioTimestamp = 0
     private var videoTimestamp = 0
+    private var audioTimestampFirst = 0
+    private var videoTimestampFirst = 0
     private var audioPTS = 0
     private var videoPTS = 0
     private var audioPTSFirst = 0
     private var videoPTSFirst = 0
-    private var audioPTSRelative = 0
-    private var videoPTSRelative = 0
 
     func dispose() {
         configs.removeAll()
         audioTimestamp = 0
         videoTimestamp = 0
+        audioTimestampFirst = 0
+        videoTimestampFirst = 0
         audioPTS = 0
         videoPTS = 0
         audioPTSFirst = 0
         videoPTSFirst = 0
-        audioPTSRelative = 0
-        videoPTSRelative = 0
     }
 }
 
@@ -48,31 +48,27 @@ extension RTMPMuxer: AudioConverterDelegate {
     func sampleOutput(audio data: UnsafeMutableAudioBufferListPointer, presentationTimeStamp: CMTime) {
         let pts = Int(round(presentationTimeStamp.seconds * 1000))
         let currentUptimeMillis = Int(floor(ProcessInfo.processInfo.systemUptime * 1000))
-        var delta = audioTimestamp == 0 ? 0 : pts - audioPTS
+        let delta = audioTimestamp == 0 ? 0 : currentUptimeMillis - audioTimestamp
+
         guard let bytes = data[0].mData, 0 < data[0].mDataByteSize && 0 <= delta else {
             return
+        }
+
+        if audioTimestampFirst == 0 {
+            audioTimestampFirst = currentUptimeMillis
         }
 
         if audioPTSFirst == 0 {
             audioPTSFirst = pts
         }
 
-        let expected = pts - audioPTSFirst
-        let actual = audioPTSRelative + delta
-        if expected - actual >= 1 && delta < 40 {
-            delta += 1
-        } else if actual - expected > 1 && delta > 20 {
-            delta -= 1
-        }
-
-        print("audio expected=\(expected) pts-delta=\(actual)")
+        print("audio timestamp=\(currentUptimeMillis - audioTimestampFirst) pts=\(pts - audioPTS)")
 
         var buffer = Data([RTMPMuxer.aac, FLVAACPacketType.raw.rawValue])
         buffer.append(bytes.assumingMemoryBound(to: UInt8.self), count: Int(data[0].mDataByteSize))
         delegate?.sampleOutput(audio: buffer, withTimestamp: Double(delta), muxer: self)
         audioTimestamp = currentUptimeMillis
-        audioPTS = Int(round(presentationTimeStamp.seconds * 1000))
-        audioPTSRelative += delta
+        audioPTS = pts
     }
 }
 
@@ -102,32 +98,27 @@ extension RTMPMuxer: VideoEncoderDelegate {
 
         let pts = Int(round(decodeTimeStamp.seconds * 1000))
         let currentUptimeMillis = Int(floor(ProcessInfo.processInfo.systemUptime * 1000))
-        var delta = videoTimestamp == 0 ? 0 : pts - videoPTS
+        let delta = videoTimestamp == 0 ? 0 : currentUptimeMillis - videoTimestamp
         guard let data = sampleBuffer.dataBuffer?.data, 0 <= delta else {
             return
+        }
+
+        if videoTimestampFirst == 0 {
+            videoTimestampFirst = currentUptimeMillis
         }
 
         if videoPTSFirst == 0 {
             videoPTSFirst = pts
         }
 
-        let expected = pts - videoPTSFirst
-        let actual = videoPTSRelative + delta
-        if expected - actual >= 1 && delta < 40 {
-            delta += 1
-        } else if actual - expected > 1 && delta > 20 {
-            delta -= 1
-        }
-
-        print("video expected=\(expected) pts-delta=\(actual)")
+        print("video timestamp=\(currentUptimeMillis - videoTimestampFirst) pts=\(pts - audioPTS)")
 
         var buffer = Data([((keyframe ? FLVFrameType.key.rawValue : FLVFrameType.inter.rawValue) << 4) | FLVVideoCodec.avc.rawValue, FLVAVCPacketType.nal.rawValue])
         buffer.append(contentsOf: compositionTime.bigEndian.data[1..<4])
         buffer.append(data)
         delegate?.sampleOutput(video: buffer, withTimestamp: Double(delta), muxer: self)
         videoTimestamp = currentUptimeMillis
-        videoPTS = Int(round(decodeTimeStamp.seconds * 1000))
-        videoPTSRelative += delta
+        videoPTS = pts
     }
 }
 
