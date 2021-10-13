@@ -40,7 +40,7 @@ extension RTMPMuxer: AudioConverterDelegate {
             return
         }
 
-        print("audio delta=\(delta)")
+        print("audio delta=\(delta) size=\(Int(data[0].mDataByteSize))")
 
         var buffer = Data([RTMPMuxer.aac, FLVAACPacketType.raw.rawValue])
         buffer.append(bytes.assumingMemoryBound(to: UInt8.self), count: Int(data[0].mDataByteSize))
