@@ -34,8 +34,8 @@ extension RTMPMuxer: AudioConverterDelegate {
     }
 
     func sampleOutput(audio data: UnsafeMutableAudioBufferListPointer, presentationTimeStamp: CMTime) {
-        let currenttimeMillis = Int(floor(Date().timeIntervalSince1970 * 1000))
-        let delta = audioTimestamp == 0 ? 0 : currenttimeMillis - audioTimestamp
+        let currentUptimeMillis = Int(floor(ProcessInfo.processInfo.systemUptime * 1000))
+        let delta = audioTimestamp == 0 ? 0 : currentUptimeMillis - audioTimestamp
         guard let bytes = data[0].mData, 0 < data[0].mDataByteSize && 0 <= delta else {
             return
         }
@@ -43,7 +43,7 @@ extension RTMPMuxer: AudioConverterDelegate {
         var buffer = Data([RTMPMuxer.aac, FLVAACPacketType.raw.rawValue])
         buffer.append(bytes.assumingMemoryBound(to: UInt8.self), count: Int(data[0].mDataByteSize))
         delegate?.sampleOutput(audio: buffer, withTimestamp: Double(delta), muxer: self)
-        audioTimestamp = currenttimeMillis
+        audioTimestamp = currentUptimeMillis
     }
 }
 
@@ -70,8 +70,9 @@ extension RTMPMuxer: VideoEncoderDelegate {
         } else {
             compositionTime = Int32((presentationTimeStamp.seconds - decodeTimeStamp.seconds) * 1000)
         }
-        let currenttimeMillis = Int(floor(Date().timeIntervalSince1970 * 1000))
-        let delta = videoTimestamp == 0 ? 0 : currenttimeMillis - videoTimestamp
+
+        let currentUptimeMillis = Int(floor(ProcessInfo.processInfo.systemUptime * 1000))
+        let delta = videoTimestamp == 0 ? 0 : currentUptimeMillis - videoTimestamp
         guard let data = sampleBuffer.dataBuffer?.data, 0 <= delta else {
             return
         }
@@ -80,7 +81,7 @@ extension RTMPMuxer: VideoEncoderDelegate {
         buffer.append(contentsOf: compositionTime.bigEndian.data[1..<4])
         buffer.append(data)
         delegate?.sampleOutput(video: buffer, withTimestamp: Double(delta), muxer: self)
-        videoTimestamp = currenttimeMillis
+        videoTimestamp = currentUptimeMillis
     }
 }
 
