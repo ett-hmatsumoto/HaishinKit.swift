@@ -14,11 +14,15 @@ final class RTMPMuxer {
     private var configs: [Int: Data] = [:]
     private var audioTimestamp = 0
     private var videoTimestamp = 0
+    private var audioPTS = 0
+    private var videoPTS = 0
 
     func dispose() {
         configs.removeAll()
         audioTimestamp = 0
         videoTimestamp = 0
+        audioPTS = 0
+        videoPTS = 0
     }
 }
 
@@ -36,7 +40,7 @@ extension RTMPMuxer: AudioConverterDelegate {
     func sampleOutput(audio data: UnsafeMutableAudioBufferListPointer, presentationTimeStamp: CMTime) {
         let currentUptimeMillis = Int(floor(ProcessInfo.processInfo.systemUptime * 1000))
         let delta = audioTimestamp == 0 ? 0 : currentUptimeMillis - audioTimestamp
-        print("audio delta=\(delta) size=\(Int(data[0].mDataByteSize))")
+        print("audio delta=\(delta) pts-delta=\(Int(presentationTimeStamp.seconds * 1000) - audioPTS)")
         guard let bytes = data[0].mData, 0 < data[0].mDataByteSize && 0 <= delta else {
             return
         }
@@ -45,6 +49,7 @@ extension RTMPMuxer: AudioConverterDelegate {
         buffer.append(bytes.assumingMemoryBound(to: UInt8.self), count: Int(data[0].mDataByteSize))
         delegate?.sampleOutput(audio: buffer, withTimestamp: Double(delta), muxer: self)
         audioTimestamp = currentUptimeMillis
+        audioPTS = Int(presentationTimeStamp.seconds * 1000)
     }
 }
 
@@ -78,13 +83,14 @@ extension RTMPMuxer: VideoEncoderDelegate {
             return
         }
 
-        print("video delta=\(delta)")
+        print("video delta=\(delta) pts-delta=\(Int(decodeTimeStamp.seconds * 1000) - videoPTS)")
 
         var buffer = Data([((keyframe ? FLVFrameType.key.rawValue : FLVFrameType.inter.rawValue) << 4) | FLVVideoCodec.avc.rawValue, FLVAVCPacketType.nal.rawValue])
         buffer.append(contentsOf: compositionTime.bigEndian.data[1..<4])
         buffer.append(data)
         delegate?.sampleOutput(video: buffer, withTimestamp: Double(delta), muxer: self)
         videoTimestamp = currentUptimeMillis
+        videoPTS = Int(decodeTimeStamp.seconds * 1000)
     }
 }
 
