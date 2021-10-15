@@ -264,7 +264,7 @@ public final class H264Encoder {
             infoFlagsOut: &flags
         )
         if !muted || lastImageBuffer == nil {
-            print("lastImageBuffer updated muted:\(muted) lastImageBuffer:\(lastImageBuffer.debugDescription)")
+            print("lastImageBuffer updated muted:\(muted) lastImageBuffer is nil:\(lastImageBuffer == nil)")
             lastImageBuffer = imageBuffer
         }
     }
